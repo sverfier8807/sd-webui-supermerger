@@ -159,6 +159,8 @@ def on_ui_tabs():
                             with gr.Row():
                                 custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
                                 mergeid = gr.Textbox(label="merge from ID", elem_id="model_converter_custom_name",value = "-1")
+                            with gr.Row():
+                                custom_name_format = gr.Textbox(label="Custom Name (Format): {model_a}, {model_b}, {model_c}, {merge_mode}, {calc_mode}, {merge_id} will be replaced with the actual values.", value=settings["custom_name"])
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():
                                 gr.HTML("<p></p>")
