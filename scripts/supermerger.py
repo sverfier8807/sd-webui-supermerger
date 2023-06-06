@@ -23,6 +23,8 @@ import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen)
 from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
 
+import configparser
+
 gensets=argparse.Namespace()
 
 def on_ui_train_tabs(params):
@@ -31,6 +33,62 @@ def on_ui_train_tabs(params):
     return None
 
 path_root = basedir()
+
+def read_settings():
+    section_desc = {
+        "use_mbw": {"value": False, "type": "bool"},
+        "save_model": {"value": False, "type": "bool"},
+        "overwrite": {"value": False, "type": "bool"},
+        "fp16": {"value": False, "type": "bool"},
+        "safetensors": {"value": True, "type": "bool"},
+        "save_metadata": {"value": False, "type": "bool"},
+        "custom_name": {"value": "", "type": "str"},
+        "write_merge_id_to_image": {"value": False, "type": "bool"},
+        "write_merge_id_to_pnginfo": {"value": False, "type": "bool"},
+        "open_upscaler_accordion": {"value": False, "type": "bool"},
+        "restore_faces": {"value": False, "type": "bool"},
+        "tiling": {"value": False, "type": "bool"},
+        "hires_fix": {"value": False, "type": "bool"},
+        "upscaler": {"value": "Latent", "type": "str"},
+        "hires_steps": {"value": 0, "type": "int"},
+        "denoising_strength": {"value": 0.7, "type": "float"},
+        "upscale_by": {"value": 2.0, "type": "float"},
+        "open_elemental_merge_accordion": {"value": False, "type": "bool"},
+        "print_change": {"value": False, "type": "bool"},
+        "elemental_params": {"value": "", "type": "str"},
+        "x_type": {"value": "alpha", "type": "str"},
+        "x_type_params": {"value": "0.25,0.5,0.75", "type": "str"},
+        "y_type": {"value": "none", "type": "str"},
+        "y_type_params_visible": {"value": False, "type": "bool"},
+        "y_type_params": {"value": "", "type": "str"},
+    }
+
+    settings = dict()
+
+    path = os.path.join(path_root, "scripts", "settings.ini")
+    if os.path.exists(path):
+        parser = configparser.ConfigParser()
+        parser.read(path, "UTF-8")
+
+        section = "supermerger.py"
+        for key, desc in section_desc.items():
+            try:
+                if desc["type"] == "str":
+                    settings[key] = parser.get(section, key)
+                elif desc["type"] == "int":
+                    settings[key] = parser.getint(section, key)
+                elif desc["type"] == "float":
+                    settings[key] = parser.getfloat(section, key)
+                elif desc["type"] == "bool":
+                    settings[key] = parser.getboolean(section, key)
+            except configparser.Error as e:
+                print("ERROR: failed to read {0}".format(settings[key]))
+                settings[key] = desc["value"]
+    else:
+        for key, desc in section_desc.items():
+            settings[key] = desc["value"]
+
+    return settings
 
 def on_ui_tabs():
     weights_presets=""
@@ -50,6 +108,8 @@ def on_ui_tabs():
                 shutil.copyfile(filepath, userfilepath)
         except OSError as e:
                 pass
+
+    settings = read_settings()
 
     with gr.Blocks() as supermergerui:
         with gr.Tab("Merge"):
@@ -73,7 +133,7 @@ def on_ui_tabs():
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
                     calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB", "smoothAdd","tensor"], value = "normal") 
                     with gr.Row(): 
-                        useblocks =  gr.Checkbox(label="use MBW")
+                        useblocks =  gr.Checkbox(label="use MBW", value=settings["use_mbw"])
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
                         base_beta = gr.Slider(label="beta", minimum=-1.0, maximum=2, step=0.001, value=0.25)
                         #weights = gr.Textbox(label="weights,base alpha,IN00,IN02,...IN11,M00,OUT00,...,OUT11",lines=2,value="0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5")
@@ -87,41 +147,61 @@ def on_ui_tabs():
                         with gr.Column(scale = 4):
                             save_sets = gr.CheckboxGroup(["save model", "overwrite","safetensors","fp16","save metadata"], value=["safetensors"], label="save settings")
                         with gr.Column(scale = 2):
-                            id_sets = gr.CheckboxGroup(["image", "PNG info"], label="write merged model ID to")
+                            id_sets_list = []
+                            if settings["write_merge_id_to_image"]:
+                                id_sets_list.append("image")
+                            if settings["write_merge_id_to_pnginfo"]:
+                                id_sets_list.append("PNG info")
+
+                            id_sets = gr.CheckboxGroup(["image", "PNG info"], label="write merged model ID to", value=id_sets_list)
                     with gr.Row():      
                         with gr.Column(min_width = 50, scale=2):
                             with gr.Row():
                                 custom_name = gr.Textbox(label="Custom Name (Optional)", elem_id="model_converter_custom_name")
                                 mergeid = gr.Textbox(label="merge from ID", elem_id="model_converter_custom_name",value = "-1")
                         with gr.Column(min_width = 50, scale=1):
-                            with gr.Row():s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
+                            with gr.Row():
+                                gr.HTML("<p></p>")
+                            with gr.Row():
+                                s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
+                                apply_save_sets_settings = gr.Button(value="Apply Settings", variant="primary")
 
-                    with gr.Accordion("Restore faces, Tiling, Hires. fix, Batch size",open = False):
+                    with gr.Accordion("Restore faces, Tiling, Hires. fix, Batch size",open = settings["open_upscaler_accordion"]):
                         batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
-                        genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value")    
+
+                        genoptions_list = []
+                        if settings["restore_faces"]:
+                            genoptions_list.append("Restore faces")
+                        if settings["tiling"]:
+                            genoptions_list.append("Tiling")
+                        if settings["hires_fix"]:
+                            genoptions_list.append("Hires. fix")
+
+                        genoptions = gr.CheckboxGroup(label = "Gen Options",choices=["Restore faces", "Tiling", "Hires. fix"], visible = True,interactive=True,type="value", value=genoptions_list)    
                         with gr.Row(elem_id="txt2img_hires_fix_row1", variant="compact"):
-                            hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=shared.latent_upscale_default_mode)
-                            hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=0, elem_id="txt2img_hires_steps")
-                            denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=0.7, elem_id="txt2img_denoising_strength")
-                            hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=2.0, elem_id="txt2img_hr_scale")
+                            hrupscaler = gr.Dropdown(label="Upscaler", elem_id="txt2img_hr_upscaler", choices=[*shared.latent_upscale_modes, *[x.name for x in shared.sd_upscalers]], value=settings["upscaler"])
+                            hr2ndsteps = gr.Slider(minimum=0, maximum=150, step=1, label='Hires steps', value=settings["hires_steps"], elem_id="txt2img_hires_steps")
+                            denois_str = gr.Slider(minimum=0.0, maximum=1.0, step=0.01, label='Denoising strength', value=settings["denoising_strength"], elem_id="txt2img_denoising_strength")
+                            hr_scale = gr.Slider(minimum=1.0, maximum=4.0, step=0.05, label="Upscale by", value=settings["upscale_by"], elem_id="txt2img_hr_scale")
                             
                     hiresfix = [genoptions,hrupscaler,hr2ndsteps,denois_str,hr_scale]
 
-                    with gr.Accordion("Elemental Merge",open = False):
+                    with gr.Accordion("Elemental Merge",open = settings["open_elemental_merge_accordion"]):
                         with gr.Row():
-                            esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True)
+                            esettings1_list = ["print change"] if settings["print_change"] else []
+                            esettings1 = gr.CheckboxGroup(label = "settings",choices=["print change"],type="value",interactive=True, value=esettings1_list)
                         with gr.Row():
-                            deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value="")
+                            deep = gr.Textbox(label="Blocks:Element:Ratio,Blocks:Element:Ratio,...",lines=2,value=settings["elemental_params"])
                     
                     with gr.Accordion("Tensor Merge",open = False,visible=False):
                         tensor = gr.Textbox(label="Blocks:Tensors",lines=2,value="")
                     
                     with gr.Row():
-                        x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index")
+                        x_type = gr.Dropdown(label="X type", choices=[x for x in TYPESEG], value="alpha", type="index", value=settings["x_type"])
                         x_randseednum = gr.Number(value=3, label="number of -1", interactive=True, visible = True)
-                    xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value="0.25,0.5,0.75")
-                    y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value="none", type="index")    
-                    ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value="",visible =False)
+                    xgrid = gr.Textbox(label="Sequential Merge Parameters",lines=3,value=settings["x_type_params"])
+                    y_type = gr.Dropdown(label="Y type", choices=[y for y in TYPESEG], value=settings["y_type"], type="index")    
+                    ygrid = gr.Textbox(label="Y grid (Disabled if blank)",lines=3,value=settings["y_type_params"],visible =settings["y_type_params_visible"])
                     with gr.Row():
                         gengrid = gr.Button(elem_id="model_merger_merge", value="Sequential XY Merge and Generation",variant='primary')
                         stopgrid = gr.Button(elem_id="model_merger_merge", value="Stop XY",variant='primary')
@@ -376,6 +456,56 @@ def on_ui_tabs():
         s_reloadtags.click(fn=tagdicter,inputs=[wpresets],outputs=[weightstags])
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
+
+        replace_items = {"{model_a}": "", "{model_b}": "", "{model_c}": "", "{merge_mode}": "", "{calc_mode}": "", "{merge_id}": ""}
+
+        def update_values(model_a_name, model_b_name, model_c_name, merge_mode, calc_mode, merge_id):
+            nonlocal replace_items
+
+            # model_name.version.safetensors | model_name.version.safetensors [hash] -> model_name.version
+            def get_model_name_without_ext(model_name):
+                output = model_name
+                if "[" in output and "]" in output:
+                    output = output.replace(output[output.rfind('['):], '').strip()
+                if "." in output:
+                    output = output.replace(output[output.rfind('.'):], '')
+
+                return output
+
+            # update
+            replace_items["{model_a}"] = get_model_name_without_ext(model_a_name)
+            replace_items["{model_b}"] = get_model_name_without_ext(model_b_name)
+            replace_items["{model_c}"] = get_model_name_without_ext(model_c_name)
+            replace_items["{merge_mode}"] = merge_mode.replace(merge_mode[merge_mode.rfind(':'):], '').replace(' ', '')
+            replace_items["{calc_mode}"] = calc_mode
+            replace_items["{merge_id}"] = merge_id
+
+        save_sets_list = []
+        if settings["save_model"]:
+            save_sets_list.append("save model")
+        if settings["overwrite"]:
+            save_sets_list.append("overwrite")
+        if settings["safetensors"]:
+            save_sets_list.append("safetensors")
+        if settings["fp16"]:
+            save_sets_list.append("fp16")
+        if settings["save_metadata"]:
+            save_sets_list.append("save metadata")
+
+        def build_custom_name(filename_format):
+            output = filename_format
+            for k, v in replace_items.items():
+                output = output.replace(k, v)
+
+            return output
+
+        load_save_sets_settings.click(
+            fn=lambda ma, mb, mc, mm, cm, mi: update_values(ma, mb, mc, mm, cm, mi),
+            inputs=[model_a, model_b, model_c, mode, calcmode, mergeid]
+        ).then(
+            fn=lambda x: [gr.CheckboxGroup.update(value=save_sets_list), gr.Textbox.update(value=build_custom_name(x))],
+            inputs=[custom_name_format], outputs=[save_sets, custom_name]
+        )
 
     return (supermergerui, "SuperMerger", "supermerger"),
 
