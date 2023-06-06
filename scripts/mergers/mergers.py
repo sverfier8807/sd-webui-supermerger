@@ -24,6 +24,8 @@ from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 
 from inspect import currentframe
 
+import configparser
+
 stopmerge = False
 
 def freezemtime():
@@ -557,11 +559,57 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             out = "ERROR: OUT of ID index"
         return out
 
+merge_id_color = None
+
+def read_settings():
+    global merge_id_color
+    if merge_id_color is None:
+        section_desc = {
+            "merge_id_color": {"value": "0, 0, 0", "type": "str"}
+        }
+
+        settings = dict()
+
+        path = os.path.join(path_root, "scripts", "settings.ini")
+        if os.path.exists(path):
+            parser = configparser.ConfigParser()
+            parser.read(path, "UTF-8")
+
+            section = "mergers.py"
+            for key, desc in section_desc.items():
+                try:
+                    if desc["type"] == "str":
+                        settings[key] = parser.get(section, key)
+                    elif desc["type"] == "int":
+                        settings[key] = parser.getint(section, key)
+                    elif desc["type"] == "float":
+                        settings[key] = parser.getfloat(section, key)
+                    elif desc["type"] == "bool":
+                        settings[key] = parser.getboolean(section, key)
+                except configparser.Error as e:
+                    print("ERROR: failed to read {0}".format(settings[key]))
+                    settings[key] = desc["value"]
+        else:
+            for key, desc in section_desc.items():
+                settings[key] = desc["value"]
+
+        pattern = re.compile(r"^\d{1,3}, ?\d{1,3}, ?\d{1,3}$")
+        if pattern.match(settings["merge_id_color"]) is None:
+            settings["merge_id_color"] = section_desc["merge_id_color"]["value"]
+
+        merge_id_color = ()
+        for k in settings["merge_id_color"].replace(" ", "").split(","):
+            merge_id_color += (int(k),)
+
 def draw_origin(grid, text,width,height,width_one):
+    if merge_id_color is None:
+        read_settings()
+
     grid_d= Image.new("RGB", (grid.width,grid.height), "white")
     grid_d.paste(grid,(0,0))
     def get_font(fontsize):
         try:
+            module = importlib.util.find_spec('fonts.ttf')
             from fonts.ttf import Roboto
             try:
                 return ImageFont.truetype(opts.font or Roboto, fontsize)
