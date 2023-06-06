@@ -501,7 +501,7 @@ def on_ui_tabs():
 
             return output
 
-        load_save_sets_settings.click(
+        apply_save_sets_settings.click(
             fn=lambda ma, mb, mc, mm, cm, mi: update_values(ma, mb, mc, mm, cm, mi),
             inputs=[model_a, model_b, model_c, mode, calcmode, mergeid]
         ).then(
