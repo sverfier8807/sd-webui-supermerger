@@ -601,6 +601,8 @@ def read_settings():
         for k in settings["merge_id_color"].replace(" ", "").split(","):
             merge_id_color += (int(k),)
 
+font_cache = {}
+            
 def draw_origin(grid, text,width,height,width_one):
     if merge_id_color is None:
         read_settings()
@@ -608,21 +610,49 @@ def draw_origin(grid, text,width,height,width_one):
     grid_d= Image.new("RGB", (grid.width,grid.height), "white")
     grid_d.paste(grid,(0,0))
     def get_font(fontsize):
+        if fontsize in font_cache:
+            print('cached font, fontsize =', fontsize)
+            return font_cache[fontsize]
+        
+        font_list = []
         try:
-            module = importlib.util.find_spec('fonts.ttf')
             from fonts.ttf import Roboto
+        except ImportError:
+            if opts.font != '':
+                font_list.append(opts.font)
+            if shared.opts.font != '':
+                font_list.append(shared.opts.font)        
+            if os.path.exists('javascript/roboto.ttf'):
+                font_list.append('javascript/roboto.ttf')
+
+            font_path = os.path.join(os.path.dirname(os.path.dirname(path_root)), 'modules', 'Roboto-Regular.ttf')
+            if os.path.exists(font_path):
+                font_list.append(font_path)
+
+        font = None
+        for f in font_list:
             try:
-                return ImageFont.truetype(opts.font or Roboto, fontsize)
-            except Exception:
-                return ImageFont.truetype(Roboto, fontsize)
-        except Exception:
-            try:
-                return ImageFont.truetype(shared.opts.font or 'javascript/roboto.ttf', fontsize)
-            except Exception:
-                return ImageFont.truetype('javascript/roboto.ttf', fontsize)
+                font = ImageFont.truetype(f, fontsize)
+                if font is not None:
+                    break
+            except OSError:
+                print('failed to load font:', f)
+                continue
+
+        if font is None:
+            raise Exception("get_font() failed")
+        
+        # add to cache
+        if fontsize not in font_cache:
+            font_cache[fontsize] = font
+
+        return font
 
     d= ImageDraw.Draw(grid_d)
-    color_active = (0, 0, 0)
+
+    pattern = re.compile(r"^(\d+|no id)$")
+    color_active = merge_id_color if pattern.match(text) is not None else (0, 0, 0)
+
     fontsize = (width+height)//25
     fnt = get_font(fontsize)
 
