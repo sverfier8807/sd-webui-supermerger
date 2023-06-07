@@ -7,7 +7,7 @@ import csv
 from PIL import Image
 from modules import images
 from modules.shared import opts
-from scripts.mergers.mergers import TYPES,smerge,simggen,filenamecutter,draw_origin,wpreseter
+from scripts.mergers.mergers import TYPES,smerge,simggen,filenamecutter,draw_origin,draw_grid_annotations,wpreseter
 from scripts.mergers.model_util import usemodelgen
 
 hear = True
@@ -363,7 +363,7 @@ def smakegrid(imgs,xs,ys,currentmodel,p):
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % len(xs) * w, i // len(xs) * h))
 
-    grid = images.draw_grid_annotations(grid,w,h, hor_texts, ver_texts)
+    grid = draw_grid_annotations(grid,w,h, hor_texts, ver_texts)
     grid = draw_origin(grid, currentmodel,w*len(xs),h*len(ys),w)
     if opts.grid_save:
         images.save_image(grid, opts.outdir_txt2img_grids, "xy_grid", extension=opts.grid_format, prompt=p.prompt, seed=p.seed, grid=True, p=p)
