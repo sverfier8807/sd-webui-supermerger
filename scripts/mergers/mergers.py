@@ -22,8 +22,6 @@ from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded
 from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 
-from inspect import currentframe
-
 import configparser
 
 stopmerge = False
@@ -559,90 +557,64 @@ def rwmergelog(mergedname = "",settings= [],id = 0):
             out = "ERROR: OUT of ID index"
         return out
 
-user_settings = None
-
-def read_settings():
-    global user_settings
-
-    if user_settings is None:
-        section_desc = {
-            "user_font": {"value": "", "type": "str"},
-            "merge_id_color": {"value": "0, 0, 0", "type": "str"},
-            "merge_id_position": {"value": "upper-left", "type": "str"}
-        }
-
-        user_settings = dict()
-
-        path = os.path.join(path_root, "scripts", "settings.ini")
-        if os.path.exists(path):
-            parser = configparser.ConfigParser()
-            parser.read(path, "UTF-8")
-
-            section = "mergers.py"
-            for key, desc in section_desc.items():
-                try:
-                    if desc["type"] == "str":
-                        user_settings[key] = parser.get(section, key)
-                    elif desc["type"] == "int":
-                        user_settings[key] = parser.getint(section, key)
-                    elif desc["type"] == "float":
-                        user_settings[key] = parser.getfloat(section, key)
-                    elif desc["type"] == "bool":
-                        user_settings[key] = parser.getboolean(section, key)
-                except configparser.Error as e:
-                    print("ERROR: failed to read {0}".format(user_settings[key]))
-                    user_settings[key] = desc["value"]
-        else:
-            for key, desc in section_desc.items():
-                user_settings[key] = desc["value"]
-
-        pattern = re.compile(r"^\d{1,3}, ?\d{1,3}, ?\d{1,3}$")
-        if pattern.match(user_settings["merge_id_color"]) is None:
-            user_settings["merge_id_color"] = section_desc["merge_id_color"]["value"]
-
-        temp = ()
-        for k in user_settings["merge_id_color"].replace(" ", "").split(","):
-            temp += (int(k),)
-        
-        # overwrite, type str -> tuple
-        user_settings["merge_id_color"] = temp
-
 font_cache = {}
+current_font = ''
 
 def get_font(fontsize):
+    from scripts.shared import USER_SETTINGS
+    
     global font_cache
-    if fontsize in font_cache:
-        print("cached font, fontsize =", fontsize)
+    global current_font
+
+    if current_font == USER_SETTINGS["user_font"] and fontsize in font_cache:
+        print(f"cached font: {current_font}, fontsize = {fontsize}")
         return font_cache[fontsize]
     
     font_list = []
-    try:
-        from fonts.ttf import Roboto
-        font_list.append(Roboto)
-    except ImportError:
-        if opts.font != "":
-            font_list.append(opts.font)
-        if shared.opts.font != "":
-            font_list.append(shared.opts.font)        
-        if os.path.exists("javascript/roboto.ttf"):
-            font_list.append("javascript/roboto.ttf")
+    user_font_exists = False
+    if USER_SETTINGS["user_font"] != "":
+        if os.path.exists(USER_SETTINGS["user_font"]):
+            font_list.append(USER_SETTINGS["user_font"])
+        if (user_font_path := os.path.join(path_root, USER_SETTINGS["user_font"])) and os.path.exists(user_font_path):
+            font_list.append(user_font_path)
 
-        font_path = os.path.join(os.path.dirname(os.path.dirname(path_root)), "modules", "Roboto-Regular.ttf")
-        if os.path.exists(font_path):
-            font_list.append(font_path)
+        user_font_exists = len(font_list) > 0
+    
+    if not user_font_exists:
+        try:
+            from fonts.ttf import Roboto
+            font_list.append(Roboto)
+        except ImportError:
+            if opts.font != "":
+                font_list.append(opts.font)
+            if shared.opts.font != "":
+                font_list.append(shared.opts.font)        
+            if os.path.exists("javascript/roboto.ttf"):
+                font_list.append("javascript/roboto.ttf")
+            if (font_path := os.path.join(os.path.dirname(os.path.dirname(path_root)), "modules", "Roboto-Regular.ttf")) and os.path.exists(font_path):
+                font_list.append(font_path)
 
+    # priority: user font -> Roboto (fonts.ttf) -> opts.font -> shared.opts.font -> javascript/roboto.ttf -> Roboto-Regular.ttf 
     font = None
     for f in font_list:
         try:
             font = ImageFont.truetype(f, fontsize)
             if font is not None:
+                if current_font != '' and current_font != f:
+                    # clear cache
+                    print('font cache cleared')
+                    font_cache = {}
+                    
+                current_font = f
+                print(f"font loaded: {current_font}, fontsize = {fontsize}")
+
                 break
         except OSError:
-            print("failed to load font:", f)
+            print(f"failed to load font: {f}")
             continue
 
     if font is None:
-        raise Exception("get_font() failed")
+        raise Exception("get_font() failed: no available font")
     
     # add to cache
     if fontsize not in font_cache:
@@ -650,17 +622,16 @@ def get_font(fontsize):
 
     return font
             
-def draw_origin(grid, text, width, height, width_one):
-    if user_settings is None:
-        read_settings()
-        
+def draw_origin(grid, text, width, height, width_one, hr_scale=1):
+    from scripts.shared import USER_SETTINGS
+    
     grid_d = Image.new("RGB", (grid.width, grid.height), "white")
     grid_d.paste(grid, (0, 0))
 
     d = ImageDraw.Draw(grid_d)
 
     merge_id_pattern = re.compile(r"^(\d+|no id)$")
-    color_active = user_settings["merge_id_color"] if merge_id_pattern.match(text) is not None else (0, 0, 0)
+    color_active = USER_SETTINGS["merge_id_color"] if merge_id_pattern.match(text) is not None else (0, 0, 0)
 
     fontsize = (width + height) // 25
     font = get_font(fontsize)
@@ -669,22 +640,57 @@ def draw_origin(grid, text, width, height, width_one):
         while d.multiline_textsize(text, font=font)[0] > width_one * 0.75 and fontsize > 0:
             fontsize -= 1
             font = get_font(fontsize)
-            
+
     if merge_id_pattern.match(text):
-        margin = 5
-        for position in user_settings["merge_id_position"].replace(" ", "").split(","):
-            text_size = d.textsize(text, font=font)
-            text_width = text_size[0]
-            text_height = text_size[1]
-            
+        # default: margin = 15
+        # default: __debug_show_bound_boxes = False
+        margin = 15 if USER_SETTINGS.value is None else USER_SETTINGS["margin"]
+        __debug_show_bound_boxes = False if USER_SETTINGS.value is None else USER_SETTINGS["__debug_show_bound_boxes"]
+
+        text_width, text_height = d.multiline_textsize(text, font=font)
+        text_padding = font.getoffset(text)[1]
+
+        # upscale
+        u_width = width * hr_scale
+        u_height = height * hr_scale
+        u_margin = margin * hr_scale
+        
+        # poisition of merge id
+        upper_left = (u_margin, u_margin - text_padding)
+        upper_right = (u_width - (text_width + u_margin), u_margin - text_padding)
+        lower_left = (u_margin, u_height - (text_height + u_margin))
+        lower_right = (u_width - (text_width + u_margin), u_height - (text_height + u_margin))
+        
+        if __debug_show_bound_boxes:
+            d.line((0, 0, u_margin, u_margin), (0, 256, 0), 1)
+            d.line((u_width, 0, u_width - u_margin, u_margin), (0, 256, 0), 1)
+            d.line((0, u_height, u_margin, u_height - u_margin), (0, 256, 0), 1)
+            d.line((u_width, u_height, u_width - u_margin, u_height - u_margin), (0, 256, 0), 1)
+
+        for position in USER_SETTINGS["merge_id_position"].replace(" ", "").split(","):
+            x, y = 0, 0
+
             if position == "upper-left":
-                d.multiline_text((0 + margin, 0), text, font=font, fill=color_active, align="center")
+                x, y = upper_left[0], upper_left[1]
+                d.multiline_text(upper_left, text, font=font, fill=color_active, align="center")          
             if position == "upper-right":
-                d.multiline_text((width - (text_width + margin), 0), text, font=font, fill=color_active, align="center")
+                x, y = upper_right[0], upper_right[1]
+                d.multiline_text(upper_right, text, font=font, fill=color_active, align="center")
             if position == "lower-left":
-                d.multiline_text((0 + margin, height - (text_height + margin * 2)), text, font=font, fill=color_active, align="center")
+                x, y = lower_left[0], lower_left[1]
+                d.multiline_text(lower_left, text, font=font, fill=color_active, align="center")    
             if position == "lower-right":
-                d.multiline_text((width - (text_width + margin * 2), height - (text_height + margin * 2)), text, font=font, fill=color_active, align="center")
+                x, y = lower_right[0], lower_right[1]
+                d.multiline_text(lower_right, text, font=font, fill=color_active, align="center")
+
+            if __debug_show_bound_boxes:
+                border_width = 1
+                bound_box_rectangle = [
+                    (x - border_width, y - border_width + text_padding),
+                    (x + text_width + border_width, y + text_height + border_width)
+                ]
+
+                d.rectangle(bound_box_rectangle, outline=(256, 0, 256))
     else:
         d.multiline_text((0, 0), text, font=font, fill=color_active, align="center")
 
@@ -749,7 +755,7 @@ def draw_grid_annotations(im, width, height, hor_texts, ver_texts, margin=0):
 
     hor_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing for lines in hor_texts]
     ver_text_heights = [sum([line.size[1] + line_spacing for line in lines]) - line_spacing * len(lines) for lines in ver_texts]
-
+            
     pad_top = 0 if sum(hor_text_heights) == 0 else max(hor_text_heights) + line_spacing * 2
 
     result = Image.new("RGB", (im.width + pad_left + margin * (cols-1), im.height + pad_top + margin * (rows-1)), "white")
@@ -868,7 +874,7 @@ def simggen(prompt, nprompt, steps, sampler, cfg, seed, w, h,genoptions,hrupscal
     processed:Processed = processing.process_images(p)
     if "image" in id_sets:
         for i, image in enumerate(processed.images):
-            processed.images[i] = draw_origin(image, str(modelid),w,h,w)
+            processed.images[i] = draw_origin(image, str(modelid), w, h, w, hr_scale if p.enable_hr else 1)
 
     if "PNG info" in id_sets:mergeinfo = mergeinfo + " ID " + str(modelid)
 

@@ -24,6 +24,7 @@ from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,s
 from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
 
 import configparser
+from scripts.shared import USER_SETTINGS
 
 gensets=argparse.Namespace()
 
@@ -35,17 +36,22 @@ def on_ui_train_tabs(params):
 path_root = basedir()
 
 def read_settings():
+    print('read settings.ini')
+    
     section_desc = {
         "use_mbw": {"value": False, "type": "bool"},
+
         "save_model": {"value": False, "type": "bool"},
         "overwrite": {"value": False, "type": "bool"},
         "fp16": {"value": False, "type": "bool"},
         "safetensors": {"value": True, "type": "bool"},
         "save_metadata": {"value": False, "type": "bool"},
+
         "custom_name": {"value": "", "type": "str"},
+
         "write_merge_id_to_image": {"value": False, "type": "bool"},
         "write_merge_id_to_pnginfo": {"value": False, "type": "bool"},
-        # "open_upscaler_accordion": {"value": False, "type": "bool"},
+
         "restore_faces": {"value": False, "type": "bool"},
         "tiling": {"value": False, "type": "bool"},
         "hires_fix": {"value": False, "type": "bool"},
@@ -53,14 +59,21 @@ def read_settings():
         "hires_steps": {"value": 0, "type": "int"},
         "denoising_strength": {"value": 0.7, "type": "float"},
         "upscale_by": {"value": 2.0, "type": "float"},
-        # "open_elemental_merge_accordion": {"value": False, "type": "bool"},
+
         "print_change": {"value": False, "type": "bool"},
         "elemental_params": {"value": "", "type": "str"},
+
         "x_type": {"value": "alpha", "type": "str"},
         "x_type_params": {"value": "0.25,0.5,0.75", "type": "str"},
         "y_type": {"value": "none", "type": "str"},
-        # "y_type_params_visible": {"value": False, "type": "bool"},
-        "y_type_params": {"value": "", "type": "str"}
+        "y_type_params": {"value": "", "type": "str"},
+
+        "user_font": {"value": "", "type": "str"},
+        "merge_id_color": {"value": "0, 0, 0", "type": "str"},
+        "merge_id_position": {"value": "upper-left", "type": "str"},
+        
+        "margin": {"value": 15, "type": "int"},
+        "__debug_show_bound_boxes": {"value": False, "type": "bool"}
     }
 
     settings = dict()
@@ -70,7 +83,7 @@ def read_settings():
         parser = configparser.ConfigParser()
         parser.read(path, "UTF-8")
 
-        section = "supermerger.py"
+        section = "supermerger"
         for key, desc in section_desc.items():
             try:
                 if desc["type"] == "str":
@@ -81,14 +94,28 @@ def read_settings():
                     settings[key] = parser.getfloat(section, key)
                 elif desc["type"] == "bool":
                     settings[key] = parser.getboolean(section, key)
-            except configparser.Error as e:
-                print("ERROR: failed to read {0}".format(settings[key]))
+            except Exception:
                 settings[key] = desc["value"]
+                print(f"ERROR: failed to read {key}, loaded default: \"{settings[key]}\"")
+                
+                continue
     else:
         for key, desc in section_desc.items():
             settings[key] = desc["value"]
 
-    return settings
+    pattern = re.compile(r"^\d{1,3}, ?\d{1,3}, ?\d{1,3}$")
+    if pattern.match(settings["merge_id_color"]) is None:
+        settings["merge_id_color"] = section_desc["merge_id_color"]["value"]
+
+    temp = ()
+    for k in settings["merge_id_color"].replace(" ", "").split(","):
+        temp += (int(k),)
+
+    # overwrite, type str -> tuple
+    settings["merge_id_color"] = temp
+
+    global USER_SETTINGS
+    USER_SETTINGS.value = settings
 
 def on_ui_tabs():
     weights_presets=""
@@ -99,7 +126,7 @@ def on_ui_tabs():
                 weights_presets = f.read()
                 filepath = userfilepath
         except OSError as e:
-                pass
+            pass
     else:
         filepath = os.path.join(path_root, "scripts","mbwpresets_master.txt")
         try:
@@ -107,17 +134,17 @@ def on_ui_tabs():
                 weights_presets = f.read()
                 shutil.copyfile(filepath, userfilepath)
         except OSError as e:
-                pass
+            pass
 
     with gr.Blocks() as supermergerui:
         with gr.Tab("Merge"):
             with gr.Row().style(equal_height=False):
                 with gr.Column(scale = 3):
                     with gr.Row():
-                        with gr.Column(scale = 7):
+                        with gr.Column(scale=3):
                             gr.HTML(value="<p>Merge models and load it for generation</p>")
-                        with gr.Column():
-                            load_settings = gr.Button(value="Load Settings")
+                        with gr.Column(scale=1):
+                            load_settings_button = gr.Button(value="Load Settings", variant="primary")
 
                     with gr.Row():
                         model_a = gr.Dropdown(sd_models.checkpoint_tiles(),elem_id="model_converter_model_name",label="Model A",interactive=True)
@@ -159,10 +186,10 @@ def on_ui_tabs():
                                 custom_name_format = gr.Textbox(label="Custom Name (Format): {model_a}, {model_b}, {model_c}, {merge_mode}, {calc_mode}, {merge_id} will be replaced with the actual values.")
                         with gr.Column(min_width = 50, scale=1):
                             with gr.Row():
-                                gr.HTML("<p></p>")
+                                gr.HTML("<p style='height: 3.5px'></p>")
                             with gr.Row():
-                                s_reverse= gr.Button(value="Set from ID(-1 for last)",variant='primary')
-                                apply_save_sets_settings = gr.Button(value="Apply Settings", variant="primary")
+                                s_reverse= gr.Button(value="Set from ID (-1 for last)",variant='primary')
+                                set_options_button = gr.Button(value="Set Options", variant="primary")
 
                     with gr.Accordion("Restore faces, Tiling, Hires. fix, Batch size",open = False):
                         batch_size = denois_str = gr.Slider(minimum=0, maximum=8, step=1, label='Batch size', value=1, elem_id="sm_txt2img_batch_size")
@@ -445,51 +472,48 @@ def on_ui_tabs():
         s_savetext.click(fn=savepresets,inputs=[wpresets],outputs=[])
         s_openeditor.click(fn=openeditors,inputs=[],outputs=[])
 
-        settings = read_settings()
-
-        def apply_settings_to_ui():
-            nonlocal settings
-            settings = read_settings()
+        def load_settings_and_apply():
+            read_settings()
             
             id_sets_list = []
-            if settings["write_merge_id_to_image"]:
+            if USER_SETTINGS["write_merge_id_to_image"]:
                 id_sets_list.append("image")
-            if settings["write_merge_id_to_pnginfo"]:
+            if USER_SETTINGS["write_merge_id_to_pnginfo"]:
                 id_sets_list.append("PNG info")
 
             genoptions_list = []
-            if settings["restore_faces"]:
+            if USER_SETTINGS["restore_faces"]:
                 genoptions_list.append("Restore faces")
-            if settings["tiling"]:
+            if USER_SETTINGS["tiling"]:
                 genoptions_list.append("Tiling")
-            if settings["hires_fix"]:
+            if USER_SETTINGS["hires_fix"]:
                 genoptions_list.append("Hires. fix")
 
-            esettings1_list = ["print change"] if settings["print_change"] else []
+            esettings1_list = ["print change"] if USER_SETTINGS["print_change"] else []
 
             return [
-                settings["use_mbw"],
+                USER_SETTINGS["use_mbw"],
                 id_sets_list,
-                settings["custom_name"],
+                USER_SETTINGS["custom_name"],
                 genoptions_list,
-                settings["upscaler"],
-                settings["hires_steps"],
-                settings["denoising_strength"],
-                settings["upscale_by"],
+                USER_SETTINGS["upscaler"],
+                USER_SETTINGS["hires_steps"],
+                USER_SETTINGS["denoising_strength"],
+                USER_SETTINGS["upscale_by"],
                 esettings1_list,
-                settings["elemental_params"],
-                settings["x_type"],
-                settings["x_type_params"],
-                settings["y_type"],
-                settings["y_type_params"]
+                USER_SETTINGS["elemental_params"],
+                USER_SETTINGS["x_type"],
+                USER_SETTINGS["x_type_params"],
+                USER_SETTINGS["y_type"],
+                USER_SETTINGS["y_type_params"]
             ]
 
         output_list = [useblocks, id_sets, custom_name_format, genoptions, hrupscaler, hr2ndsteps, denois_str, hr_scale, esettings1, deep, x_type, xgrid, y_type, ygrid]
-        load_settings.click(fn=apply_settings_to_ui, inputs=[], outputs=output_list)
+        load_settings_button.click(fn=load_settings_and_apply, inputs=[], outputs=output_list)
 
         replace_items = {"{model_a}": "", "{model_b}": "", "{model_c}": "", "{merge_mode}": "", "{calc_mode}": "", "{merge_id}": ""}
 
-        def update_replace_values(model_a_name, model_b_name, model_c_name, merge_mode, calc_mode, merge_id):
+        def update_replace_items(model_a_name, model_b_name, model_c_name, merge_mode, calc_mode, merge_id):
             nonlocal replace_items
 
             # model_name.version.safetensors | model_name.version.safetensors [hash] -> model_name.version
@@ -511,34 +535,39 @@ def on_ui_tabs():
             replace_items["{merge_id}"] = merge_id
 
         def get_save_sets_list():
+            if not USER_SETTINGS.value:
+                return []
+
             save_sets_list = []  
-            if settings["save_model"]:
+            if USER_SETTINGS["save_model"]:
                 save_sets_list.append("save model")
-            if settings["overwrite"]:
+            if USER_SETTINGS["overwrite"]:
                 save_sets_list.append("overwrite")
-            if settings["safetensors"]:
+            if USER_SETTINGS["safetensors"]:
                 save_sets_list.append("safetensors")
-            if settings["fp16"]:
+            if USER_SETTINGS["fp16"]:
                 save_sets_list.append("fp16")
-            if settings["save_metadata"]:
+            if USER_SETTINGS["save_metadata"]:
                 save_sets_list.append("save metadata")
 
             return save_sets_list
 
-        def build_custom_name(filename_format):
-            output = filename_format
+        def build_custom_name(format):
+            output = format
             for k, v in replace_items.items():
                 output = output.replace(k, v)
 
             return output
 
-        apply_save_sets_settings.click(
-            fn=lambda ma, mb, mc, mm, cm, mi: update_replace_values(ma, mb, mc, mm, cm, mi),
+        set_options_button.click(
+            fn=lambda ma, mb, mc, mm, cm, mi: update_replace_items(ma, mb, mc, mm, cm, mi),
             inputs=[model_a, model_b, model_c, mode, calcmode, mergeid]
         ).then(
             fn=lambda x: [gr.CheckboxGroup.update(value=get_save_sets_list()), gr.Textbox.update(value=build_custom_name(x))],
             inputs=[custom_name_format], outputs=[save_sets, custom_name]
         )
+
+        read_settings()
 
     return (supermergerui, "SuperMerger", "supermerger"),
 
