@@ -348,7 +348,7 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         xyimage,xs,ys = effectivechecker(xyimage,xs,ys,model_a,model_b,esettings)
 
     if not "grid" in esettings:
-        gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
+        gridmodel= makegridmodelname(model_a, model_b, model_c, useblocks, mode, xtype, ytype, alpha, beta, weights_a, weights_b, usebeta, deep)
         grid = smakegrid(xyimage,xs,ys,gridmodel,image_temp[4])
         xyimage.insert(0,grid)
 
@@ -372,7 +372,7 @@ def smakegrid(imgs,xs,ys,currentmodel,p):
 
     return grid
 
-def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,wa,wb,usebeta):
+def makegridmodelname(model_a, model_b, model_c, useblocks, mode, xtype, ytype, alpha, beta, wa, wb, usebeta, deep):
     model_a=filenamecutter(model_a)
     model_b=filenamecutter(model_b)
     model_c=filenamecutter(model_c)
