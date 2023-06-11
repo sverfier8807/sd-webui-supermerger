@@ -22,8 +22,6 @@ from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded
 from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
 
-import configparser
-
 stopmerge = False
 
 def freezemtime():
@@ -217,7 +215,8 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 theta_0_norm = nn.functional.normalize(theta_0[key].to(torch.float32), p=2, dim=0)
                 theta_1_norm = nn.functional.normalize(theta_1[key].to(torch.float32), p=2, dim=0)
                 simab = sim(theta_0_norm, theta_1_norm)
-                sims = np.append(sims,simab.numpy())
+                sims = np.append(sims, simab.numpy())
+                # sims = np.append(sims, simab.detach().cpu().numpy())
         sims = sims[~np.isnan(sims)]
         sims = np.delete(sims, np.where(sims<np.percentile(sims, 1 ,method = 'midpoint')))
         sims = np.delete(sims, np.where(sims>np.percentile(sims, 99 ,method = 'midpoint')))
@@ -235,6 +234,7 @@ def smerge(weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode
                 magnitude_similarity = dot_product / (torch.norm(theta_0[key].to(torch.float32)) * torch.norm(theta_1[key].to(torch.float32)))
                 combined_similarity = (simab + magnitude_similarity) / 2.0
                 sims = np.append(sims, combined_similarity.numpy())
+                # sims = np.append(sims, combined_similarity.detach().cpu().numpy())
         sims = sims[~np.isnan(sims)]
         sims = np.delete(sims, np.where(sims < np.percentile(sims, 1, method='midpoint')))
         sims = np.delete(sims, np.where(sims > np.percentile(sims, 99, method='midpoint')))
@@ -567,7 +567,6 @@ def get_font(fontsize):
     global current_font
 
     if current_font == USER_SETTINGS["user_font"] and fontsize in font_cache:
-        print(f"cached font: {current_font}, fontsize = {fontsize}")
         return font_cache[fontsize]
     
     font_list = []
@@ -602,12 +601,10 @@ def get_font(fontsize):
             if font is not None:
                 if current_font != '' and current_font != f:
                     # clear cache
-                    print('font cache cleared')
+                    print(f'font changed to {f}, cache cleared')
                     font_cache = {}
                     
                 current_font = f
-                print(f"font loaded: {current_font}, fontsize = {fontsize}")
-
                 break
         except OSError:
             print(f"failed to load font: {f}")
@@ -624,7 +621,7 @@ def get_font(fontsize):
             
 def draw_origin(grid, text, width, height, width_one, hr_scale=1):
     from scripts.shared import USER_SETTINGS
-    
+
     grid_d = Image.new("RGB", (grid.width, grid.height), "white")
     grid_d.paste(grid, (0, 0))
 

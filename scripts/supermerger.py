@@ -23,6 +23,7 @@ import scripts.mergers.pluslora as pluslora
 from scripts.mergers.mergers import (TYPESEG, freezemtime, rwmergelog, simggen,smergegen)
 from scripts.mergers.xyplot import freezetime, nulister, numaker, numanager
 
+import codecs
 import configparser
 from scripts.shared import USER_SETTINGS
 
@@ -102,6 +103,9 @@ def read_settings():
     else:
         for key, desc in section_desc.items():
             settings[key] = desc["value"]
+
+    unescape = lambda *x: map(lambda y: codecs.decode(y, 'unicode-escape'), x)
+    settings["elemental_params"], settings["x_type_params"], settings["y_type_params"] = unescape(settings["elemental_params"], settings["x_type_params"], settings["y_type_params"])
 
     pattern = re.compile(r"^\d{1,3}, ?\d{1,3}, ?\d{1,3}$")
     if pattern.match(settings["merge_id_color"]) is None:

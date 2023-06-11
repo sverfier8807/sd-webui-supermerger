@@ -10,6 +10,8 @@ from modules.shared import opts
 from scripts.mergers.mergers import TYPES,smerge,simggen,filenamecutter,draw_origin,draw_grid_annotations,wpreseter
 from scripts.mergers.model_util import usemodelgen
 
+import re
+
 hear = True
 hearm = False
 
@@ -434,7 +436,15 @@ def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha
 
     vals = f"\nalpha = {alpha},beta = {beta}" if not useblocks else f"\n{wa}\n{wb}"
 
-    currentmodel = currentmodel+vals
+    params = ""
+    if deep != "":
+        # split parameters
+        fn = lambda x: (lambda y: "\n".join([", ".join(y[i : i + 2 if i + 2 < len(y) + 1 else i + 1]) for i in range(0, len(y), 2)]))(re.split(r"\s*,\s*|\n", x))
+        params = fn(deep)
+        
+    elemental = f"\n\n[Elemental Merge]\n{params}" if deep != "" else ""
+
+    currentmodel = currentmodel + vals + elemental
     return currentmodel
 
 def effectivechecker(imgs,xs,ys,model_a,model_b,esettings):
