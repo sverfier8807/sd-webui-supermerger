@@ -353,13 +353,9 @@ def sgenxyplot(xtype,xmen,ytype,ymen,esettings,
         xyimage,xs,ys = effectivechecker(xyimage,xs,ys,model_a,model_b,esettings)
 
     if not "grid" in esettings:
-<<<<<<< HEAD
-        gridmodel= makegridmodelname(model_a, model_b, model_c, useblocks, mode, xtype, ytype, alpha, beta, weights_a, weights_b, usebeta, deep)
-=======
         if "swap XY" in esettings:
             xyimage, xs, ys = swapxy(xyimage, xs, ys)
-        gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta)
->>>>>>> upstream/main
+        gridmodel= makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,weights_a,weights_b,usebeta,deep)
         grid = smakegrid(xyimage,xs,ys,gridmodel,image_temp[4])
         xyimage.insert(0,grid)
 
