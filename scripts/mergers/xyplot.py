@@ -379,9 +379,6 @@ def smakegrid(imgs,xs,ys,currentmodel,p):
 
     return grid
 
-<<<<<<< HEAD
-def makegridmodelname(model_a, model_b, model_c, useblocks, mode, xtype, ytype, alpha, beta, wa, wb, usebeta, deep):
-=======
 def swapxy(imgs,xs,ys):
     nimgs = []
     for x in range(len(xs)):
@@ -389,8 +386,7 @@ def swapxy(imgs,xs,ys):
             nimgs.append(imgs[y * len(xs) + x])
     return nimgs, ys, xs
 
-def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,wa,wb,usebeta):
->>>>>>> upstream/main
+def makegridmodelname(model_a, model_b,model_c, useblocks,mode,xtype,ytype,alpha,beta,wa,wb,usebeta,deep):
     model_a=filenamecutter(model_a)
     model_b=filenamecutter(model_b)
     model_c=filenamecutter(model_c)
