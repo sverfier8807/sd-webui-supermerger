@@ -164,7 +164,15 @@ def on_ui_tabs():
                                                         "Triple sum:A*(1-alpha-beta)+B*alpha+C*beta",
                                                         "sum Twice:(A*(1-alpha)+B*alpha)*(1-beta)+C*beta",
                                                          ], value = "Weight sum:A*(1-alpha)+B*alpha") 
-                    calcmode = gr.Radio(label = "Calcutation Mode",choices = ["normal", "cosineA", "cosineB", "smoothAdd","tensor"], value = "normal") 
+                    with gr.Row():
+                        with gr.Column():
+                            calcmode = gr.Radio(label="Calcutation Mode", choices=["normal", "cosineA", "cosineB", "smoothAdd", "smoothAdd MT", "tensor"], value="normal") 
+                        with gr.Column():
+                            with gr.Row():
+                                with gr.Column():
+                                    threads = gr.Radio(label="Threads (smoothAdd MT)", choices=["auto", "4", "8", "16", "32"], value="auto")
+                                with gr.Column():
+                                    tasks_per_thread = gr.Radio(label="Tasks per thread", choices=["8", "16"], value="8")
                     with gr.Row(): 
                         useblocks =  gr.Checkbox(label="use MBW")
                         base_alpha = gr.Slider(label="alpha", minimum=-1.0, maximum=2, step=0.001, value=0.5)
@@ -242,7 +250,7 @@ def on_ui_tabs():
             with gr.Row(visible = False) as row_blockids:
                 blockids = gr.CheckboxGroup(label = "block IDs",choices=[x for x in blockid],type="value",interactive=True)
             with gr.Row(visible = False) as row_calcmode:
-                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB", "smoothAdd","tensor"],type="value",interactive=True)
+                calcmodes = gr.CheckboxGroup(label = "calcmode",choices=["normal", "cosineA", "cosineB", "smoothAdd", "smoothAdd MT", "tensor"], type="value", interactive=True)
             with gr.Row(visible = False) as row_checkpoints:
                 checkpoints = gr.CheckboxGroup(label = "checkpoint",choices=[x.model_name for x in sd_models.checkpoints_list.values()],type="value",interactive=True)
             with gr.Row(visible = False) as row_esets:
@@ -323,13 +331,13 @@ def on_ui_tabs():
             with gr.Tab("Reservation"):
                 with gr.Row():
                     s_reserve = gr.Button(value="Reserve XY Plot",variant='primary')
-                    s_reloadreserve = gr.Button(value="Reloat List",variant='primary')
-                    s_startreserve = gr.Button(value="Start XY plot",variant='primary')
-                    s_delreserve = gr.Button(value="Delete list(-1 for all)",variant='primary')
-                    s_delnum = gr.Number(value=1, label="Delete num : ", interactive=True, visible = True,precision =0)
+                    s_reloadreserve = gr.Button(value="Reload List",variant='primary')
+                    s_startreserve = gr.Button(value="Start XY Plot",variant='primary')
+                    s_delreserve = gr.Button(value="Delete List (-1 for all)",variant='primary')
+                    s_delnum = gr.Number(value=1, label="Delete Num:", interactive=True, visible = True,precision =0)
                 with gr.Row():
                     numaframe = gr.Dataframe(
-                        headers=["No.","status","xtype","xmenber", "ytype","ymenber","model A","model B","model C","alpha","beta","mode","use MBW","weights alpha","weights beta"],
+                        headers=["No.", "status", "xtype", "xmember", "ytype", "ymember", "model A", "model B", "model C", "alpha", "beta", "merge mode", "calc mode", "threads", "tasks per thread", "use MBW", "weights alpha", "weights beta"],
                         row_count=5,)
             # with gr.Tab("manual"):
             #     with gr.Row():
@@ -400,7 +408,7 @@ def on_ui_tabs():
 
         load_history.click(fn=load_historyf,outputs=[history ])
 
-        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor]
+        msettings=[weights_a,weights_b,model_a,model_b,model_c,base_alpha,base_beta,mode,calcmode,useblocks,custom_name,save_sets,id_sets,wpresets,deep,tensor,threads,tasks_per_thread]
         imagegal = [mgallery,mgeninfo,mhtmlinfo,mhtmllog]
         xysettings=[x_type,xgrid,y_type,ygrid,esettings]
 
