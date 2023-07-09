@@ -4,7 +4,7 @@
 #
 # format: set [TARGET] = [VALUE]
 #
-# [TARGET] = block, blocks (OUT04-OUT11 or reversed order: OUT11-OUT04), ALL, ALL(except block, blocks, all), not implemented: FLAGGED, UNFLAGGED
+# [TARGET] = block, blocks (OUT04-OUT11 or reversed order: OUT11-OUT04), ALL, ALL(except block, blocks, all), not implemented: INCLUDED, EXCLUDED
 # [VALUE] = integer or float (within the range from -1.5 to 1.5), and random values: R, U, X()
 #
 # COSINE : set OUT04=0.25
@@ -66,7 +66,7 @@
 #
 # [not implemented]
 #
-# FLAGGED and UNFLAGGED keywords, operators in ALL(except ...)
+# INCLUDED and EXCLUDED (set INCLUDED=..., set EXCLUDED=...), operators in ALL(except ...)
 
 import re
 import numpy as np
