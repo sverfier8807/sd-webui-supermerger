@@ -21,6 +21,7 @@ from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded
 from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
+from scripts.mergers.preset_instruction import process_instructions
 from math import ceil
 from multiprocessing import cpu_count
 from threading import Lock
@@ -839,7 +840,9 @@ def draw_origin(grid, text,width,height,width_one):
     return grid_d
 
 def wpreseter(w,presets):
-    if "," not in w and w != "":
+    re_weights = re.compile(r"(?:(?:\d+\.\d*|\d*\.\d+|\d+|E?R|E?U|E?X)\s*,\s*){25}(?:\d+\.\d*|\d*\.\d+|\d+|E?R|E?U|E?X)\s*")
+
+    if re_weights.match(w) is None and w != "":
         presets=presets.splitlines()
         wdict={}
         for l in presets:
@@ -849,10 +852,19 @@ def wpreseter(w,presets):
             if "\t" in l:
                 key = l.split("\t",1)[0]
                 wdict[key.strip()]=l.split("\t",1)[1]
-        if w.strip() in wdict:
-            name = w
-            w = wdict[w.strip()]
-            print(f"weights {name} imported from presets : {w}")
+        
+        # get first block of weights -> first : second : third
+        w_list = w.split(":")
+        name = w_list[0].strip()
+
+        if name in wdict:
+            weights = wdict[name]
+            if len(w_list) > 1:
+                w = process_instructions(weights, w, ":")
+                print(f"weights {name} processed : {w}")
+            else:
+                w = weights
+                print(f"weights {name} imported from presets : {weights}")
     return w
 
 def fullpathfromname(name):
