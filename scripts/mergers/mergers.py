@@ -840,7 +840,14 @@ def draw_origin(grid, text,width,height,width_one):
     return grid_d
 
 def wpreseter(w,presets):
-    re_weights = re.compile(r"(?:(?:\d+\.\d*|\d*\.\d+|\d+|E?R|E?U|E?X)\s*,\s*){25}(?:\d+\.\d*|\d*\.\d+|\d+|E?R|E?U|E?X)\s*")
+    re_weights = re.compile(r"""
+    ^
+        \s*
+        (?:(?:-?\d+\.\d*|-?\d*\.\d+|-?\d+|E?R|E?U|E?X)\s*,\s*){25}
+        (?:-?\d+\.\d*|-?\d*\.\d+|-?\d+|E?R|E?U|E?X)
+        \s*
+    $
+    """, re.VERBOSE | re.IGNORECASE)
 
     if re_weights.match(w) is None and w != "":
         presets=presets.splitlines()
