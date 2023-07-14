@@ -21,7 +21,7 @@ from modules.shared import opts
 from modules.processing import create_infotext,Processed
 from modules.sd_models import  load_model,checkpoints_loaded
 from scripts.mergers.model_util import usemodelgen,filenamecutter,savemodel
-from scripts.mergers.preset_instruction import process_instructions
+from scripts.mergers.preset_instruction import PresetInstruction
 from math import ceil
 from multiprocessing import cpu_count
 from threading import Lock
@@ -878,11 +878,13 @@ def wpreseter(w,presets):
         if name in wdict:
             weights = wdict[name]
             if len(w_list) > 1:
-                w = process_instructions(weights, w, ":")
+                p = PresetInstruction(weights, w)
+                w = p.process()
                 print(f"weights {name} processed : {w}")
             else:
                 w = weights
                 print(f"weights {name} imported from presets : {weights}")
+
     return w
 
 def fullpathfromname(name):
