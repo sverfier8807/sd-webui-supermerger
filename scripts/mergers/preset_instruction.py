@@ -243,13 +243,13 @@ class PresetInstruction:
                     value = max(min(value, 1.5), -1.5) if operator == '=' else value
                     self.__log(f'PresetInstruction -> integer or float: value = {value}')
 
-                    for block in included:
-                        if block not in excluded:
-                            if operator == '=':
+                    if operator == '=':
+                        for block in included:
+                            if block not in excluded:
                                 self.block_data[block]['value'] = value
-                            else:
-                                # operator = +=, -=, *=, /=
-                                self.__calculate(included, excluded, operator[0], value)
+                    else:
+                        # operator = +=, -=, *=, /=
+                        self.__calculate(included, excluded, operator[0], value)
 
                 # value: R, U
                 elif (matched := cls.re_v_rand_r_or_u.match(value)) is not None:
