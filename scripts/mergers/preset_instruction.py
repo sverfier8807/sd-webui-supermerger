@@ -143,14 +143,14 @@ class PresetInstruction:
             for block, data in self.block_data.items():
                 if len(included) == 0 and len(excluded) == 0:
                     if data['calculate']:
-                        result = fn(data['value'], value)
+                        result = fn(float(str(data['value'])), float(str(value)))
                         result = max(min(result, 1.5), -1.5)
 
                         self.block_data[block]['value'] = result
                 else:
                     if block in included:
                         if block not in excluded:
-                            result = fn(data['value'], value)
+                            result = fn(float(str(data['value'])), float(str(value)))
                             result = max(min(result, 1.5), -1.5)
 
                             self.block_data[block]['value'] = result
